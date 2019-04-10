@@ -1,0 +1,59 @@
+version: '3.7'
+
+# Before runnning this docker-compose.yml,
+# You have to configure vm.max_map_count = 262144.
+# Otherwise elasticsearch container does not launch certainly by
+# displaying following error message.
+#  ERROR: [1] bootstrap checks failed
+#  [1]: max virtual memory areas vm.max_map_count [65530] is too low, increase to at least [262144]
+
+# When you use linux, execute following command.
+# vi /etc/sysctl.conf
+# vm.max_map_count = 262144
+# sudo sysctl --system
+
+# To forward container logs, you add following "logging" directive to
+# configuration of each container
+#
+# logging:
+#   driver: "fluentd"
+#   options:
+#     fluentd-address: "localhost:24224"
+#     tag: "docker.logging_driver.es"
+
+services:
+  es:
+    # https://www.elastic.co/guide/en/elasticsearch/reference/current/docker.html
+    # mkdir ${PWD}/es/{nodes,config}
+    # chown -R 1000:1000 ${PWD}/es
+    image: docker.elastic.co/elasticsearch/elasticsearch-oss:6.7.1
+    container_name: "es"
+    restart: always
+    expose:
+      - "9200"
+      - "9300"
+    volumes:
+      - ${PWD}/es:/usr/share/elasticsearch/data
+  kibana:
+    # https://www.elastic.co/guide/en/kibana/current/docker.html
+    image: docker.elastic.co/kibana/kibana-oss:6.7.1
+    container_name: "kibana"
+    restart: always
+    ports:
+      - "5601:5601"
+    depends_on:
+      - es
+    environment:
+      - ELASTICSEARCH_HOSTS=http://es:9200
+  fluentd:
+    build: ./fluentd
+    restart: always
+    command: >
+      /usr/bin/fluentd -c /fluentd/etc/fluent.conf -v
+    ports:
+      - "24224:24224"
+      - "24224:24224/udp"
+    volumes:
+      - ${PWD}/log:/fluentd/log
+      - ${PWD}/fluent.conf:/fluentd/etc/fluent.conf:ro
+
